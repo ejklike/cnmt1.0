@@ -4,10 +4,9 @@ Implementation of "Attention is All You Need"
 
 import torch.nn as nn
 
-from onmt.encoders.encoder import EncoderBase
 from onmt.modules import MultiHeadedAttention
 from onmt.modules.position_ffn import PositionwiseFeedForward
-from onmt.utils.misc import sequence_mask
+from onmt.utils.misc import sequence_mask, aeq
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -57,7 +56,7 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout.p = dropout
 
 
-class TransformerEncoder(EncoderBase):
+class TransformerEncoder(nn.Module):
     """The Transformer encoder from "Attention is All You Need"
     :cite:`DBLP:journals/corr/VaswaniSPUJGKP17`
 
@@ -114,8 +113,26 @@ class TransformerEncoder(EncoderBase):
             embeddings,
             opt.max_relative_positions)
 
+    def _check_args(self, src, lengths=None, hidden=None):
+        n_batch = src.size(1)
+        if lengths is not None:
+            n_batch_, = lengths.size()
+            aeq(n_batch, n_batch_)
+
     def forward(self, src, lengths=None):
-        """See :func:`EncoderBase.forward()`"""
+        """
+        Args:
+            src (LongTensor):
+               padded sequences of sparse indices ``(src_len, batch, nfeat)``
+            lengths (LongTensor): length of each sequence ``(batch,)``
+
+
+        Returns:
+            (FloatTensor, FloatTensor):
+
+            * final encoder state, used to initialize decoder
+            * memory bank for attention, ``(src_len, batch, hidden)``
+        """
         self._check_args(src, lengths)
 
         emb = self.embeddings(src)

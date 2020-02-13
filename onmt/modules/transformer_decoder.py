@@ -5,7 +5,6 @@ Implementation of "Attention is All You Need"
 import torch
 import torch.nn as nn
 
-from onmt.decoders.decoder import DecoderBase
 from onmt.modules import MultiHeadedAttention, AverageAttention
 from onmt.modules.position_ffn import PositionwiseFeedForward
 from onmt.utils.misc import sequence_mask
@@ -177,7 +176,7 @@ class TransformerDecoderLayer(nn.Module):
         self.drop.p = dropout
 
 
-class TransformerDecoder(DecoderBase):
+class TransformerDecoder(nn.Module):
     """The Transformer decoder from "Attention is All You Need".
     :cite:`DBLP:journals/corr/VaswaniSPUJGKP17`
 

@@ -9,11 +9,10 @@ from torch.nn.init import xavier_uniform_
 
 import onmt.inputters as inputters
 import onmt.modules
-from onmt.encoders import TransformerEncoder
-
-from onmt.decoders import TransformerDecoder
-
-from onmt.modules import Embeddings, CopyGenerator
+from onmt.modules import (Embeddings, 
+                          CopyGenerator,
+                          TransformerEncoder, 
+                          TransformerDecoder)
 from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
