@@ -2,13 +2,13 @@
 import torch.nn as nn
 
 
-def batch_z(z, lengths, max_len=None):
-    """
-    input z: (batch, zdim)
-    output z: (len, batch, zdim)
-    """
-    max_len = max_len or lengths.max()
-    return z.unsqueeze(0).repeat(maxlen, 1, 1)
+# def batch_z(z, lengths, max_len=None):
+#     """
+#     input z: (batch, zdim)
+#     output z: (len, batch, zdim)
+#     """
+#     max_len = max_len or lengths.max()
+#     return z.unsqueeze(0).repeat(maxlen, 1, 1)
 
 
 class CNMTModel(nn.Module):
@@ -29,7 +29,8 @@ class CNMTModel(nn.Module):
         self.src2tgt = src2tgt
         self.tgt2src = tgt2src
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False):
+    def forward(self, src, tgt, src_lengths, tgt_lengths, 
+                bptt=False, with_align=False):
         """Forward propagate a `src` and `tgt` pair for training.
         Possible initialized with a beginning decoder state.
 
@@ -53,30 +54,31 @@ class CNMTModel(nn.Module):
         """
         # Q(z|x,y)
         mu, sigma = self.q_inf(src, tgt, src_lengths, tgt_lengths)
+
+        # p(z|x), p(z|y)
+        mu_src, sigma_src = self.src_p_inf(src, src_lengths)
+        mu_tgt, sigma_tgt = self.tgt_p_inf(tgt, tgt_lengths)
         
         # Sample z
         noise = mu.clone().normal_()
-        z = mu + noise * sigma
+        z = mu + noise * sigma # [bs, zdim]
 
-        # create batches of z
-        z_src = batch_z(z, src_lengths)
-        z_tgt = batch_z(z, tgt_lengths)
+        # # create batches of z
+        # z_src = batch_z(z, src_lengths)
+        # z_tgt = batch_z(z, tgt_lengths)
 
-        # LM(x), LM(y)
-        prob_srclm = self.srclm(z_src, src, src_lengths, src_emb)
-        prob_tgtlm = self.tgtlm(z_tgt, tgt, tgt_lengths, tgt_emb)
+        # p(y|x,z)
+        tgt_out = self.src2tgt(src, tgt, src_lengths, bptt=bptt, with_align=with_align)
 
-        
-
-        dec_in_tgt = tgt[:-1]  # exclude last target from inputs
-
-        enc_state, memory_bank, lengths = self.encoder(src, lengths)
-
-        if bptt is False:
-            self.decoder.init_state(src, memory_bank, enc_state)
         dec_out, attns = self.decoder(dec_in, memory_bank,
                                     memory_lengths=lengths,
                                     with_align=with_align)
+
+        dec_in_tgt2src = src[:-1]
+
+        
+
+        
         return dec_out, attns
 
     def update_dropout(self, dropout):
