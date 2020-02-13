@@ -7,8 +7,7 @@ from onmt.modules.sparse_activations import sparsemax
 from onmt.utils.misc import aeq, sequence_mask
 
 # This class is mainly used by decoder.py for RNNs but also
-# by the CNN / transformer decoder when copy attention is used
-# CNN has its own attention mechanism ConvMultiStepAttention
+# by the transformer decoder when copy attention is used
 # Transformer has its own MultiHeadedAttention
 
 

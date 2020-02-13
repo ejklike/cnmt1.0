@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 import configargparse
-from onmt.models.sru import CheckSRU
 
 
 def config_opts(parser):
@@ -64,15 +63,15 @@ def model_opts(parser):
               help='Data type of the model.')
 
     group.add('--encoder_type', '-encoder_type', type=str, default='rnn',
-              choices=['rnn', 'brnn', 'mean', 'transformer', 'cnn'],
+              choices=['rnn', 'brnn', 'mean', 'transformer'],
               help="Type of encoder layer to use. Non-RNN layers "
                    "are experimental. Options are "
-                   "[rnn|brnn|mean|transformer|cnn].")
+                   "[rnn|brnn|mean|transformer].")
     group.add('--decoder_type', '-decoder_type', type=str, default='rnn',
-              choices=['rnn', 'transformer', 'cnn'],
+              choices=['rnn', 'transformer'],
               help="Type of decoder layer to use. Non-RNN layers "
                    "are experimental. Options are "
-                   "[rnn|transformer|cnn].")
+                   "[rnn|transformer].")
 
     group.add('--layers', '-layers', type=int, default=-1,
               help='Number of layers in enc/dec.')
@@ -89,9 +88,6 @@ def model_opts(parser):
     group.add('--dec_rnn_size', '-dec_rnn_size', type=int, default=500,
               help="Size of decoder rnn hidden states. "
                    "Must be equal to enc_rnn_size.")
-    group.add('--cnn_kernel_width', '-cnn_kernel_width', type=int, default=3,
-              help="Size of windows in the cnn, the kernel_size is "
-                   "(cnn_kernel_width, 1) in conv layer")
 
     group.add('--input_feed', '-input_feed', type=int, default=1,
               help="Feed the context vector at each time step as "
@@ -101,8 +97,7 @@ def model_opts(parser):
               help="Have an additional layer between the last encoder "
                    "state and the first decoder state")
     group.add('--rnn_type', '-rnn_type', type=str, default='LSTM',
-              choices=['LSTM', 'GRU', 'SRU'],
-              action=CheckSRU,
+              choices=['LSTM', 'GRU'],
               help="The gate type to use in the RNNs")
     # group.add('--residual', '-residual',   action="store_true",
     #                     help="Add residual connections between RNN layers.")

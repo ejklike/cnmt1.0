@@ -64,7 +64,7 @@ class RNNDecoderBase(DecoderBase):
 
     Args:
        rnn_type (str):
-          style of recurrent unit to use, one of [RNN, LSTM, GRU, SRU]
+          style of recurrent unit to use, one of [RNN, LSTM, GRU]
        bidirectional_encoder (bool) : use with a bidirectional encoder
        num_layers (int) : number of stacked layers
        hidden_size (int) : hidden size of each layer
@@ -223,10 +223,6 @@ class RNNDecoderBase(DecoderBase):
             self.state["coverage"] = attns["coverage"][-1].unsqueeze(0)
 
         # Concatenates sequence of tensors along a new dimension.
-        # NOTE: v0.3 to 0.4: dec_outs / attns[*] may not be list
-        #       (in particular in case of SRU) it was not raising error in 0.3
-        #       since stack(Variable) was allowed.
-        #       In 0.4, SRU returns a tensor that shouldn't be stacke
         if type(dec_outs) == list:
             dec_outs = torch.stack(dec_outs)
 
@@ -424,8 +420,6 @@ class InputFeedRNNDecoder(RNNDecoderBase):
 
     def _build_rnn(self, rnn_type, input_size,
                    hidden_size, num_layers, dropout):
-        assert rnn_type != "SRU", "SRU doesn't support input feed! " \
-            "Please set -input_feed 0!"
         stacked_cell = StackedLSTM if rnn_type == "LSTM" else StackedGRU
         return stacked_cell(num_layers, input_size, hidden_size, dropout)
 

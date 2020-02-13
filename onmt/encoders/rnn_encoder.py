@@ -14,7 +14,7 @@ class RNNEncoder(EncoderBase):
 
     Args:
        rnn_type (str):
-          style of recurrent unit to use, one of [RNN, LSTM, GRU, SRU]
+          style of recurrent unit to use, one of [RNN, LSTM, GRU]
        bidirectional (bool) : use a bidirectional RNN
        num_layers (int) : number of stacked layers
        hidden_size (int) : hidden size of each layer

@@ -59,8 +59,6 @@ class ArgumentParser(cfargparse.ArgumentParser):
         assert same_size, \
             "The encoder and decoder rnns must be the same size for now"
 
-        assert model_opt.rnn_type != "SRU" or model_opt.gpu_ranks, \
-            "Using SRU requires -gpu_ranks set."
         if model_opt.lambda_align > 0.0:
             assert model_opt.decoder_type == 'transformer', \
                 "Only transformer is supported to joint learn alignment."
