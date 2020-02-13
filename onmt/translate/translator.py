@@ -468,7 +468,7 @@ class Translator(object):
         """
         # (0) add BOS and padding to tgt prediction
         if hasattr(batch, 'tgt'):
-            batch_tgt_idxs = batch.tgt.transpose(1, 2).transpose(0, 2)
+            batch_tgt_idxs = batch.tgt[0].transpose(1, 2).transpose(0, 2)
         else:
             batch_tgt_idxs = self._align_pad_prediction(
                 predictions, bos=self._tgt_bos_idx, pad=self._tgt_pad_idx)
@@ -708,7 +708,7 @@ class Translator(object):
 
     def _score_target(self, batch, memory_bank, src_lengths,
                       src_vocabs, src_map):
-        tgt = batch.tgt
+        tgt = batch.tgt[0]
         tgt_in = tgt[:-1]
 
         log_probs, attn = self._decode_and_generate(

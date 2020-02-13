@@ -155,7 +155,7 @@ class LossComputeBase(nn.Module):
             A tuple with the loss and a :obj:`onmt.utils.Statistics` instance.
         """
         if trunc_size is None:
-            trunc_size = batch.tgt.size(0) - trunc_start
+            trunc_size = batch.tgt[0].size(0) - trunc_start
         trunc_range = (trunc_start, trunc_start + trunc_size)
         shard_state = self._make_shard_state(batch, output, trunc_range, attns)
         if shard_size == 0:
@@ -235,7 +235,7 @@ class NMTLossCompute(LossComputeBase):
     def _make_shard_state(self, batch, output, range_, attns=None):
         shard_state = {
             "output": output,
-            "target": batch.tgt[range_[0] + 1: range_[1], :, 0],
+            "target": batch.tgt[0][range_[0] + 1: range_[1], :, 0],
         }
         if self.lambda_coverage != 0.0:
             coverage = attns.get("coverage", None)
@@ -262,7 +262,7 @@ class NMTLossCompute(LossComputeBase):
                 "alignement attention head"
             assert align_idx is not None, "lambda_align != 0.0 requires " \
                 "provide guided alignement"
-            pad_tgt_size, batch_size, _ = batch.tgt.size()
+            pad_tgt_size, batch_size, _ = batch.tgt[0].size()
             pad_src_size = batch.src[0].size(0)
             align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
             ref_align = onmt.utils.make_batch_align_matrix(

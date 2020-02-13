@@ -141,13 +141,13 @@ def get_fields(
 
     src_field_kwargs = {"n_feats": n_src_feats,
                         "include_lengths": True,
-                        "pad": pad, "bos": None, "eos": None,
+                        "pad": pad, "bos": bos, "eos": eos,
                         "truncate": src_truncate,
                         "base_name": "src"}
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
     tgt_field_kwargs = {"n_feats": n_tgt_feats,
-                        "include_lengths": False,
+                        "include_lengths": True,
                         "pad": pad, "bos": bos, "eos": eos,
                         "truncate": tgt_truncate,
                         "base_name": "tgt"}
