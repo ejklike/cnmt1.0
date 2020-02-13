@@ -74,6 +74,40 @@ def build_decoder(opt, embeddings):
     return TransformerDecoder.from_opt(opt, embeddings)
 
 
+def build_generator(opt, embeddings):
+    if not opt.copy_attn:
+        if opt.generator_function == "sparsemax":
+            gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
+        else:
+            gen_func = nn.LogSoftmax(dim=-1)
+        generator = nn.Sequential(
+            nn.Linear(opt.dec_rnn_size,
+                    len(fields["tgt"].base_field.vocab)),
+            Cast(torch.float32),
+            gen_func
+        )
+        if opt.share_decoder_embeddings:
+            generator[0].weight = embeddings.word_lut.weight
+    else:
+        tgt_base_field = fields["tgt"].base_field
+        vocab_size = len(tgt_base_field.vocab)
+        pad_idx = tgt_base_field.vocab.stoi[tgt_base_field.pad_token]
+        generator = CopyGenerator(opt.dec_rnn_size, vocab_size, pad_idx)
+        if opt.share_decoder_embeddings:
+            generator.linear.weight = embeddings.word_lut.weight
+
+
+def init_param(model):
+    for p in model.parameters():
+        p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+
+
+def init_xavier_param(model):
+    for p in model.parameters():
+        if p.dim() > 1:
+            xavier_uniform_(p)
+
+
 def load_test_model(opt, model_path=None):
     if model_path is None:
         model_path = opt.models[0]
@@ -126,55 +160,43 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
 
     # Build embeddings.
     src_field = fields["src"]
-    src_emb = build_embeddings(model_opt, src_field)
-
-    # Build encoder.
-    encoder = build_encoder(model_opt, src_emb)
-
-    # Build decoder.
+    src_emb = build_embeddings(model_opt, src_field, for_encoder=True)
     tgt_field = fields["tgt"]
     tgt_emb = build_embeddings(model_opt, tgt_field, for_encoder=False)
-
     # Share the embedding matrix - preprocess with share_vocab required.
     if model_opt.share_embeddings:
         # src/tgt vocab should be the same if `-share_vocab` is specified.
         assert src_field.base_field.vocab == tgt_field.base_field.vocab, \
             "preprocess with -share_vocab if you use share_embeddings"
-
         tgt_emb.word_lut.weight = src_emb.word_lut.weight
 
-    decoder = build_decoder(model_opt, tgt_emb)
+    # Q(z|x,y)
+    src_q_encoder = build_encoder(model_opt, src_emb)
+    tgt_q_encoder = build_encoder(model_opt, tgt_emb)
+    W_q = nn.Linear(model_opt.enc_rnn_size * 2, model_opt.zdim * 2)
+    q_inf_model = onmt.models.QInfModel(src_q_encoder, tgt_q_encoder, W_q) #
+    
+    # p(z|x)
+    src_p_encoder = build_encoder(model_opt, src_emb)
+    W_src_p = nn.Linear(model_opt.enc_rnn_size, model_opt.zdim * 2)
+    src_p_inf_model = onmt.models.PInfModel(src_p_encoder, W_src_p) #
+
+    # p(z|y)
+    tgt_p_encoder = build_encoder(model_opt, tgt_emb)
+    W_tgt_p = nn.Linear(model_opt.enc_rnn_size, model_opt.zdim * 2)
+    tgt_p_inf_model = onmt.models.PInfModel(tgt_p_encoder, W_tgt_p) #
 
     # Build NMTModel(= encoder + decoder).
-    if gpu and gpu_id is not None:
-        device = torch.device("cuda", gpu_id)
-    elif gpu and not gpu_id:
-        device = torch.device("cuda")
-    elif not gpu:
-        device = torch.device("cpu")
-    model = onmt.models.NMTModel(encoder, decoder)
+    shared_encoder = build_encoder(model_opt, src_emb)
+    src2tgt_decoder = build_decoder(model_opt, tgt_emb)
+    tgt2src_decoder = build_decoder(model_opt, src_emb)
+    # p(y|x,z), p(x|y,z)
+    src2tgt_model = onmt.models.NMTModel(shared_encoder, src2tgt_decoder) #
+    tgt2src_model = onmt.models.NMTModel(shared_encoder, tgt2src_decoder) #
 
     # Build Generator.
-    if not model_opt.copy_attn:
-        if model_opt.generator_function == "sparsemax":
-            gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
-        else:
-            gen_func = nn.LogSoftmax(dim=-1)
-        generator = nn.Sequential(
-            nn.Linear(model_opt.dec_rnn_size,
-                      len(fields["tgt"].base_field.vocab)),
-            Cast(torch.float32),
-            gen_func
-        )
-        if model_opt.share_decoder_embeddings:
-            generator[0].weight = decoder.embeddings.word_lut.weight
-    else:
-        tgt_base_field = fields["tgt"].base_field
-        vocab_size = len(tgt_base_field.vocab)
-        pad_idx = tgt_base_field.vocab.stoi[tgt_base_field.pad_token]
-        generator = CopyGenerator(model_opt.dec_rnn_size, vocab_size, pad_idx)
-        if model_opt.share_decoder_embeddings:
-            generator.linear.weight = decoder.embeddings.word_lut.weight
+    src2tgt_generator = build_generator(model_opt, tgt_emb) #
+    tgt2src_generator = build_generator(model_opt, src_emb) #
 
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:
@@ -186,34 +208,63 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
                        r'\1.layer_norm\2.weight', s)
             return s
 
-        checkpoint['model'] = {fix_key(k): v
-                               for k, v in checkpoint['model'].items()}
+        for key in ['q_inf_model', 'src_p_inf_model', 'tgt_p_inf_model', 
+                    'src2tgt_model', 'tgt2src_model']:
+            checkpoint[key] = {fix_key(k): v
+                               for k, v in checkpoint[key].items()}
         # end of patch for backward compatibility
 
-        model.load_state_dict(checkpoint['model'], strict=False)
-        generator.load_state_dict(checkpoint['generator'], strict=False)
+        q_inf_model.load_state_dict(
+            checkpoint['q_inf_model'], strict=False)
+        src_p_inf_model.load_state_dict(
+            checkpoint['src_p_inf_model'], strict=False)
+        tgt_p_inf_model.load_state_dict(
+            checkpoint['tgt_p_inf_model'], strict=False)
+        src2tgt_model.load_state_dict(
+            checkpoint['src2tgt_model'], strict=False)
+        tgt2src_model.load_state_dict(
+            checkpoint['tgt2src_model'], strict=False)
+        src2tgt_generator.load_state_dict(
+            checkpoint['src2tgt_generator'], strict=False)
+        tgt2src_generator.load_state_dict(
+            checkpoint['tgt2src_generator'], strict=False)
+
     else:
         if model_opt.param_init != 0.0:
-            for p in model.parameters():
-                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-            for p in generator.parameters():
-                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+            for model in [q_inf_model, src_p_inf_model, tgt_p_inf_model, 
+                          src2tgt_model, tgt2src_model, 
+                          src2tgt_generator, tgt2src_generator]:
+                init_param(model)
         if model_opt.param_init_glorot:
-            for p in model.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p)
-            for p in generator.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p)
+            for model in [q_inf_model, src_p_inf_model, tgt_p_inf_model, 
+                          src2tgt_model, tgt2src_model, 
+                          src2tgt_generator, tgt2src_generator]:
+                init_xavier_param(model)
 
-        if hasattr(model.encoder, 'embeddings'):
-            model.encoder.embeddings.load_pretrained_vectors(
-                model_opt.pre_word_vecs_enc)
-        if hasattr(model.decoder, 'embeddings'):
-            model.decoder.embeddings.load_pretrained_vectors(
-                model_opt.pre_word_vecs_dec)
+        for model in [q_inf_model.src_encoder,
+                      q_inf_model.tgt_encoder,
+                      src_p_inf_model.encoder,
+                      tgt_p_inf_model.encoder,
+                      src2tgt_model.encoder,
+                      src2tgt_model.decoder,
+                      tgt2src_model.encoder,
+                      tgt2src_model.decoder]:
+            if hasattr(model, 'embeddings'):
+                model.embeddings.load_pretrained_vectors(
+                    model_opt.pre_word_vecs_enc)
 
-    model.generator = generator
+    src2tgt_model.generator = src2tgt_generator
+    tgt2src_model.generator = tgt2src_generator
+
+    if gpu and gpu_id is not None:
+        device = torch.device("cuda", gpu_id)
+    elif gpu and not gpu_id:
+        device = torch.device("cuda")
+    elif not gpu:
+        device = torch.device("cpu")
+    
+    model = CNMTModel(q_inf_model, src_p_inf_model, tgt_p_inf_model, 
+                      src2tgt_model, tgt2src_model)
     model.to(device)
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         model.half()

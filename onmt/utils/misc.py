@@ -171,3 +171,20 @@ def check_model_config(model_config, root):
                         raise FileNotFoundError(
                             "{} from model {} does not exist".format(
                                 tok_path, model_config["id"]))
+
+
+def masked_average(memory_banks, lengths):
+    """
+    input:
+    memory_banks: (len, batch, features)
+    lengths: (batch, )
+    output:
+    masked_average: (batch, features)
+    """
+    # (batch, len)
+    mask = sequence_mask(lengths) # 0 if out of len
+    # (len, batch, 1)
+    mask = mask.transpose(0, 1).unsqueeze(2).float()
+    # (1, batch, 1)
+    unsqueezed_lengths = lengths.unsqueeze(0).unsqueeze(2).float()
+    return torch.sum(memory_banks * mask, dim=0) / unsqueezed_lengths
