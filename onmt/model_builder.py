@@ -13,7 +13,7 @@ from onmt.encoders import str2enc
 
 from onmt.decoders import str2dec
 
-from onmt.modules import Embeddings, VecEmbedding, CopyGenerator
+from onmt.modules import Embeddings, CopyGenerator
 from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
