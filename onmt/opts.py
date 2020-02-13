@@ -38,8 +38,7 @@ def model_opts(parser):
                    "and decoder. Need to use shared dictionary for this "
                    "option.")
     group.add('--position_encoding', '-position_encoding', action='store_true',
-              help="Use a sin to mark relative words positions. "
-                   "Necessary for non-RNN style models.")
+              help="Use a sin to mark relative words positions. ")
 
     group = parser.add_argument_group('Model-Embedding Features')
     group.add('--feat_merge', '-feat_merge', type=str, default='concat',
@@ -62,16 +61,10 @@ def model_opts(parser):
               choices=['fp32', 'fp16'],
               help='Data type of the model.')
 
-    group.add('--encoder_type', '-encoder_type', type=str, default='rnn',
-              choices=['rnn', 'brnn', 'mean', 'transformer'],
-              help="Type of encoder layer to use. Non-RNN layers "
-                   "are experimental. Options are "
-                   "[rnn|brnn|mean|transformer].")
-    group.add('--decoder_type', '-decoder_type', type=str, default='rnn',
-              choices=['rnn', 'transformer'],
-              help="Type of decoder layer to use. Non-RNN layers "
-                   "are experimental. Options are "
-                   "[rnn|transformer].")
+    group.add('--encoder_type', '-encoder_type', type=str, 
+              default='transformer')
+    group.add('--decoder_type', '-decoder_type', type=str, 
+              default='transformer')
 
     group.add('--layers', '-layers', type=int, default=-1,
               help='Number of layers in enc/dec.')
@@ -96,14 +89,6 @@ def model_opts(parser):
     group.add('--bridge', '-bridge', action="store_true",
               help="Have an additional layer between the last encoder "
                    "state and the first decoder state")
-    group.add('--rnn_type', '-rnn_type', type=str, default='LSTM',
-              choices=['LSTM', 'GRU'],
-              help="The gate type to use in the RNNs")
-    # group.add('--residual', '-residual',   action="store_true",
-    #                     help="Add residual connections between RNN layers.")
-
-    group.add('--brnn', '-brnn', action=DeprecateAction,
-              help="Deprecated, use `encoder_type`.")
 
     group.add('--context_gate', '-context_gate', type=str, default=None,
               choices=['source', 'target', 'both'],

@@ -9,9 +9,9 @@ from torch.nn.init import xavier_uniform_
 
 import onmt.inputters as inputters
 import onmt.modules
-from onmt.encoders import str2enc
+from onmt.encoders import TransformerEncoder
 
-from onmt.decoders import str2dec
+from onmt.decoders import TransformerDecoder
 
 from onmt.modules import Embeddings, CopyGenerator
 from onmt.modules.util_class import Cast
@@ -62,8 +62,7 @@ def build_encoder(opt, embeddings):
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
-    enc_type = opt.encoder_type
-    return str2enc[enc_type].from_opt(opt, embeddings)
+    return TransformerEncoder.from_opt(opt, embeddings)
 
 
 def build_decoder(opt, embeddings):
@@ -73,9 +72,7 @@ def build_decoder(opt, embeddings):
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
-    dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed \
-               else opt.decoder_type
-    return str2dec[dec_type].from_opt(opt, embeddings)
+    return TransformerDecoder.from_opt(opt, embeddings)
 
 
 def load_test_model(opt, model_path=None):

@@ -6,7 +6,7 @@
 
 <!-- option: -share_vocab -->
 
-> python train.py -data data/data -save_model data/tmp -rnn_size 10 -word_vec_size 10 -heads 1 -layers 1 -train_steps 100 -optim adam  -learning_rate 0.001 -encoder_type transformer -decoder_type transformer
+> python train.py -data data/data -save_model data/tmp -rnn_size 10 -word_vec_size 10 -heads 1 -layers 1 -train_steps 100 -optim adam  -learning_rate 0.001
 
 <!-- option: -world_size 1 -gpu_ranks 0  -->
 
